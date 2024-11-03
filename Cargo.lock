@@ -2853,9 +2853,16 @@ dependencies = [
  "egui_extras",
  "ehttp",
  "image",
- "memmap2",
  "rustc-hash 2.0.0",
+ "rustitude_base",
  "tokio",
+]
+
+[[package]]
+name = "rustitude_base"
+version = "0.1.0"
+dependencies = [
+ "rustc-hash 2.0.0",
 ]
 
 [[package]]

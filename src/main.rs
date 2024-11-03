@@ -2,14 +2,16 @@ use std::{
     sync::{Arc, RwLock},
     thread,
 };
-pub mod base;
 pub mod view;
-use base::map_state::{walk, Location};
 use egui::{
     pos2, vec2, Align2, Color32, FontId, Margin, Painter, Pos2, Rect, Rounding, Sense, Stroke,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
-use view::{egui::EguiMapImgRes, MapViewState, TILE_SIZE};
+use rustitude_base::{
+    map_state::{walk, Location},
+    map_view_state::{MapViewState, TILE_SIZE},
+};
+use view::egui::EguiMapImgRes;
 
 fn main() {
     let rc = Arc::new("value");
@@ -47,7 +49,17 @@ fn main() {
     println!("Hello, world!");
 }
 
-impl MapViewState {
+trait EguiMap {
+    fn egui_map(
+        self: &mut Self,
+        ui: &mut egui::Ui,
+        res: &mut EguiMapImgRes,
+        self_ref: Arc<RwLock<Self>>,
+        debug: bool,
+    ) -> egui::Response;
+}
+
+impl EguiMap for MapViewState {
     fn egui_map(
         self: &mut Self,
         ui: &mut egui::Ui,

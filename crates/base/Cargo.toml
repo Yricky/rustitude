@@ -1,0 +1,9 @@
+[package]
+name = "rustitude_base"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+
+[dependencies]
+rustc-hash = "2.0.0"

@@ -1,5 +1,4 @@
 use std::{
-    fmt::Display,
     fs,
     sync::{Arc, RwLock},
 };
@@ -8,12 +7,10 @@ use egui::{
     load::{SizedTexture, TexturePoll},
     vec2, Context, Image, Vec2,
 };
-use ehttp::Request;
 use rustc_hash::{FxHashMap, FxHashSet};
+use rustitude_base::{map_view_state::MapViewState, qtree::QTreeKey};
 
-use crate::base::qtree::QTreeKey;
-
-use super::MapViewState;
+use crate::view::priv_fn::build_req;
 
 pub struct EguiMapImgRes {
     pub data_map: Arc<RwLock<FxHashMap<QTreeKey, SizedTexture>>>,
