@@ -37,6 +37,30 @@ impl Add for Location {
 }
 
 impl Location {
+    pub const ZERO: Location = Location { x: 0.0, y: 0.0 };
+    pub const UNIT: Location = Location { x: 1.0, y: 1.0 };
+
+    pub fn wrap(self: &Self, lt: Location, rb: Location) -> Self {
+        let x = self.x;
+        let y = self.y;
+        Location::new(
+            if x < lt.x {
+                lt.x
+            } else if x > rb.x {
+                rb.x
+            } else {
+                x
+            },
+            if y < lt.y {
+                lt.y
+            } else if y > rb.y {
+                rb.y
+            } else {
+                y
+            },
+        )
+    }
+
     pub fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }

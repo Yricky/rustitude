@@ -66,18 +66,16 @@ impl MapViewState {
         let click = ui.input(|i| i.pointer.any_click());
         if let Some(p) = ppos {
             if zoom != 1.0 {
-                self.apply_zoom_delta(
-                    zoom.into(),
-                    self.view_pos_to_location([p.x.into(), p.y.into()]),
-                );
+                self.apply_zoom_delta(zoom.into(), [p.x.into(), p.y.into()]);
             }
         }
-        self.set_central(Location::new(
-            self.central.x - (scroll.x as f64) / (TILE_SIZE * self.zoom()),
-            self.central.y - (scroll.y as f64) / (TILE_SIZE * self.zoom()),
-        ));
-        // self.central.x -= (scroll.x as f64) / (TILE_SIZE * self.zoom());
-        // self.central.y -= (scroll.y as f64) / (TILE_SIZE * self.zoom());
+        if scroll.x != 0.0 || scroll.y != 0.0 {
+            self.set_central(Location::new(
+                self.central.x - (scroll.x as f64) / (TILE_SIZE * self.zoom()),
+                self.central.y - (scroll.y as f64) / (TILE_SIZE * self.zoom()),
+            ));
+        }
+
         walk(self.top_left_key(), self.bottom_right_key()).for_each(|k| {
             let lt = self.location_to_view_pos(Location::from_qtree_key(k));
             let screen_zoom = (TILE_SIZE * 2.0_f64.powf(self.zoom_lvl - k.depth() as f64)) as f32;
@@ -144,6 +142,14 @@ impl MapViewState {
                     "Pointer position:{}",
                     ppos.map(|pos| format!("{}", pos))
                         .unwrap_or(String::from("None"))
+                ));
+                ui.label(format!(
+                    "Pointer position:{}",
+                    ppos.map(|pos| format!(
+                        "{}",
+                        self.view_pos_to_location([pos.x as f64, pos.y as f64])
+                    ))
+                    .unwrap_or(String::from("None"))
                 ));
                 ui.label(format!("Scroll delta:{}", scroll));
                 ui.label(format!("Zoom delta:{}", zoom));
