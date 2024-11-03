@@ -64,7 +64,7 @@ impl MapViewState {
 
     pub fn top_left_key(&self) -> QTreeKey {
         self.top_left_location()
-            .as_qtree_key(self.zoom_lvl as u8)
+            .as_qtree_key((self.zoom_lvl + 0.4) as u8)
             .unwrap()
     }
 
@@ -75,7 +75,7 @@ impl MapViewState {
 
     pub fn bottom_right_key(&self) -> QTreeKey {
         self.bottom_right_location()
-            .as_qtree_key(self.zoom_lvl as u8)
+            .as_qtree_key((self.zoom_lvl + 0.4) as u8)
             .unwrap()
     }
 }

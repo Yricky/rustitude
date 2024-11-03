@@ -3,8 +3,10 @@ use std::{
     thread,
 };
 pub mod view;
-use egui::{vec2, Align2, Color32, FontId, Margin, Painter, Pos2, Rect, Rounding, Sense, Stroke};
-use rustc_hash::{FxHashMap, FxHashSet};
+use egui::{
+    load::BytesLoader, vec2, Align2, Color32, FontId, Margin, Painter, Pos2, Rect, Rounding, Sense,
+    Stroke,
+};
 use rustitude_base::{
     map_state::{walk, Location},
     map_view_state::{MapViewState, TILE_SIZE},
@@ -28,18 +30,11 @@ fn main() {
                     view_size: [1280.0, 800.0],
                     zoom_lvl: 2.0,
                 })),
-                res: Arc::new(EguiMapImgResImpl {
-                    data_map: Arc::new(RwLock::new(FxHashMap::default())),
-                    rt: Arc::new(
-                        tokio::runtime::Builder::new_multi_thread()
-                            .worker_threads(4) // 8个工作线程
-                            .enable_io() // 可在runtime中使用异步IO
-                            .enable_time() // 可在runtime中使用异步计时器(timer)
-                            .build() // 创建runtime
-                            .unwrap(),
-                    ),
-                    loading_lock: Arc::new(RwLock::new(FxHashSet::default())),
-                }),
+                main_res: Arc::new(EguiMapImgResImpl::new("img")),
+                other_res: vec![
+                    Arc::new(EguiMapImgResImpl::new("cia")),
+                    Arc::new(EguiMapImgResImpl::new("cva")),
+                ],
                 debug: false,
             }))
         }),
@@ -52,6 +47,7 @@ trait EguiMap {
         self: &mut Self,
         ui: &mut egui::Ui,
         res: Arc<dyn EguiMapImgRes>,
+        other_res: &Vec<Arc<dyn EguiMapImgRes>>,
         self_ref: Arc<RwLock<Self>>,
         debug: bool,
     ) -> egui::Response;
@@ -62,6 +58,7 @@ impl EguiMap for MapViewState {
         self: &mut Self,
         ui: &mut egui::Ui,
         res: Arc<dyn EguiMapImgRes>,
+        other_res: &Vec<Arc<dyn EguiMapImgRes>>,
         self_ref: Arc<RwLock<Self>>,
         debug: bool,
     ) -> egui::Response {
@@ -120,6 +117,12 @@ impl EguiMap for MapViewState {
                     ),
                 );
             }
+            other_res.iter().for_each(|r| {
+                let tile = r.get(k, self_ref.clone(), ui.ctx());
+                if let Some(t) = tile {
+                    t.draw(&painter, this_rect);
+                }
+            });
             if debug {
                 painter.text(
                     ltpos,
@@ -160,17 +163,42 @@ impl EguiMap for MapViewState {
                 ui.label("--------------------");
                 ui.label(format!("Center:{}", self.central));
                 ui.label(format!("Zoom level:{}", self.zoom_lvl as u8));
+                ui.label(format!("Top left:{}", self.top_left_key()));
+                ui.label(format!("Bottom right:{}", self.bottom_right_key()));
+                ui.label("--------------------");
                 ui.label(format!(
-                    "Top left:{}",
-                    self.top_left_location()
-                        .as_qtree_key(self.zoom_lvl as u8)
-                        .unwrap()
+                    "include_mem:{}",
+                    ui.ctx().loaders().include.byte_size()
                 ));
                 ui.label(format!(
-                    "Bottom right:{}",
-                    self.bottom_right_location()
-                        .as_qtree_key(self.zoom_lvl as u8)
-                        .unwrap()
+                    "texture_mem:{}",
+                    ui.ctx()
+                        .loaders()
+                        .texture
+                        .lock()
+                        .iter()
+                        .map(|l| l.byte_size())
+                        .sum::<usize>()
+                ));
+                ui.label(format!(
+                    "bytes_mem:{}",
+                    ui.ctx()
+                        .loaders()
+                        .bytes
+                        .lock()
+                        .iter()
+                        .map(|l| l.byte_size())
+                        .sum::<usize>()
+                ));
+                ui.label(format!(
+                    "image_mem:{}",
+                    ui.ctx()
+                        .loaders()
+                        .image
+                        .lock()
+                        .iter()
+                        .map(|l| l.byte_size())
+                        .sum::<usize>()
                 ));
             });
         }
@@ -180,7 +208,8 @@ impl EguiMap for MapViewState {
 
 struct MapViewStateTestApp {
     map_view_state: Arc<RwLock<MapViewState>>,
-    res: Arc<dyn EguiMapImgRes>,
+    main_res: Arc<dyn EguiMapImgRes>,
+    other_res: Vec<Arc<dyn EguiMapImgRes>>,
     debug: bool,
 }
 
@@ -196,7 +225,8 @@ impl eframe::App for MapViewStateTestApp {
                 let mut nvs = self.map_view_state.write().unwrap();
                 nvs.egui_map(
                     ui,
-                    self.res.clone(),
+                    self.main_res.clone(),
+                    &self.other_res,
                     self.map_view_state.clone(),
                     self.debug,
                 );
