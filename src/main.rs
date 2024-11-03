@@ -3,15 +3,13 @@ use std::{
     thread,
 };
 pub mod view;
-use egui::{
-    pos2, vec2, Align2, Color32, FontId, Margin, Painter, Pos2, Rect, Rounding, Sense, Stroke,
-};
+use egui::{vec2, Align2, Color32, FontId, Margin, Painter, Pos2, Rect, Rounding, Sense, Stroke};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustitude_base::{
     map_state::{walk, Location},
     map_view_state::{MapViewState, TILE_SIZE},
 };
-use view::egui::EguiMapImgRes;
+use view::egui::{EguiMapImgRes, EguiMapImgResImpl};
 
 fn main() {
     let rc = Arc::new("value");
@@ -30,7 +28,7 @@ fn main() {
                     view_size: [1280.0, 800.0],
                     zoom_lvl: 2.0,
                 })),
-                res: EguiMapImgRes {
+                res: Arc::new(EguiMapImgResImpl {
                     data_map: Arc::new(RwLock::new(FxHashMap::default())),
                     rt: Arc::new(
                         tokio::runtime::Builder::new_multi_thread()
@@ -40,8 +38,8 @@ fn main() {
                             .build() // 创建runtime
                             .unwrap(),
                     ),
-                    lock: Arc::new(RwLock::new(FxHashSet::default())),
-                },
+                    loading_lock: Arc::new(RwLock::new(FxHashSet::default())),
+                }),
                 debug: false,
             }))
         }),
@@ -53,7 +51,7 @@ trait EguiMap {
     fn egui_map(
         self: &mut Self,
         ui: &mut egui::Ui,
-        res: &mut EguiMapImgRes,
+        res: Arc<dyn EguiMapImgRes>,
         self_ref: Arc<RwLock<Self>>,
         debug: bool,
     ) -> egui::Response;
@@ -63,7 +61,7 @@ impl EguiMap for MapViewState {
     fn egui_map(
         self: &mut Self,
         ui: &mut egui::Ui,
-        res: &mut EguiMapImgRes,
+        res: Arc<dyn EguiMapImgRes>,
         self_ref: Arc<RwLock<Self>>,
         debug: bool,
     ) -> egui::Response {
@@ -101,18 +99,11 @@ impl EguiMap for MapViewState {
             };
             let use_parent = parent_tile.is_some() && k.x() % 2 == 0 && k.y() % 2 == 0;
             if let Some(t) = tile {
-                painter.image(
-                    t.id,
-                    this_rect,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
+                t.draw(&painter, this_rect);
             } else if use_parent {
-                painter.image(
-                    parent_tile.unwrap().id,
+                parent_tile.unwrap().draw(
+                    &painter,
                     Rect::from_min_size(ltpos, vec2(screen_zoom * 2.0, screen_zoom * 2.0)),
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
                 );
             } else if parent_tile.is_none() {
                 painter.rect_filled(
@@ -189,7 +180,7 @@ impl EguiMap for MapViewState {
 
 struct MapViewStateTestApp {
     map_view_state: Arc<RwLock<MapViewState>>,
-    res: EguiMapImgRes,
+    res: Arc<dyn EguiMapImgRes>,
     debug: bool,
 }
 
@@ -203,7 +194,12 @@ impl eframe::App for MapViewStateTestApp {
                 }
                 ui.checkbox(&mut self.debug, "debug");
                 let mut nvs = self.map_view_state.write().unwrap();
-                nvs.egui_map(ui, &mut self.res, self.map_view_state.clone(), self.debug);
+                nvs.egui_map(
+                    ui,
+                    self.res.clone(),
+                    self.map_view_state.clone(),
+                    self.debug,
+                );
             });
     }
 }
