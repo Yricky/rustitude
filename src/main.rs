@@ -17,8 +17,6 @@ use view::{
 };
 
 fn main() {
-    let rc = Arc::new("value");
-    thread::spawn(move || println!("{}", rc.clone()));
     let _ = eframe::run_native(
         "app_name",
         eframe::NativeOptions {
@@ -42,7 +40,6 @@ fn main() {
             }))
         }),
     );
-    println!("Hello, world!");
 }
 
 trait EguiMap {

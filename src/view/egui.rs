@@ -100,8 +100,8 @@ impl EguiMapImgResImpl {
                 Arc::new(
                     tokio::runtime::Builder::new_multi_thread()
                         .worker_threads(8) // 8个工作线程
-                        .enable_io() // 可在runtime中使用异步IO
-                        .enable_time() // 可在runtime中使用异步计时器(timer)
+                        // .enable_io() // 可在runtime中使用异步IO
+                        // .enable_time() // 可在runtime中使用异步计时器(timer)
                         .build() // 创建runtime
                         .unwrap(),
                 )
