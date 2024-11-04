@@ -17,4 +17,4 @@ rustitude_base = { version = "0.1.0", path = "crates/base" }
 tokio = { version = "1.41.0", features = ["full"] }
 
 [workspace]
-members = ["crates/base"]
+members = ["crates/base", "crates/emap"]

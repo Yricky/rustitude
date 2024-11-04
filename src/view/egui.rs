@@ -17,6 +17,7 @@ pub const TILE_SIZE_VEC2: Vec2 = vec2(256.0, 256.0);
 
 pub trait EguiDrawable: Send + Sync {
     fn draw(&self, painter: &Painter, rect: Rect);
+    fn clip(&self, rect: Rect) -> CommonEguiDrawable;
 }
 
 type CommonEguiDrawable = Arc<dyn EguiDrawable>;
@@ -52,6 +53,32 @@ impl EguiDrawable for SizedTexture {
             Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
             Color32::WHITE,
         );
+    }
+
+    fn clip(&self, rect: Rect) -> CommonEguiDrawable {
+        let d = (self.clone(), rect);
+        Arc::new(d)
+    }
+}
+
+impl EguiDrawable for (SizedTexture, Rect) {
+    fn draw(&self, painter: &Painter, rect: Rect) {
+        painter.image(self.0.id, rect, self.1, Color32::WHITE);
+    }
+
+    fn clip(&self, rect: Rect) -> CommonEguiDrawable {
+        let self_size = self.1.size();
+        let rect_size = rect.size();
+        Arc::new((
+            self.0,
+            Rect::from_min_size(
+                pos2(
+                    self.1.min.x + self_size.x * rect.min.x,
+                    self.1.min.y + self_size.y * rect.min.y,
+                ),
+                vec2(self_size.x * rect_size.x, self_size.y * rect_size.y),
+            ),
+        ))
     }
 }
 
@@ -193,7 +220,7 @@ impl EguiMapImgResImpl {
                 let mut will_del: Vec<QTreeKey> = vec![];
                 if hot_map.len() > 500 {
                     hot_map.iter().for_each(|t| {
-                        if time.checked_sub(t.1.clone()).unwrap_or(0) > 20_000 {
+                        if t.0.depth() > 3 && time.checked_sub(t.1.clone()).unwrap_or(0) > 20_000 {
                             will_del.push(t.0.clone());
                         }
                     });

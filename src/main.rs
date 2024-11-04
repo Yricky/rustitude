@@ -11,7 +11,10 @@ use rustitude_base::{
     map_state::{walk, Location},
     map_view_state::{MapViewState, TILE_SIZE},
 };
-use view::egui::{EguiMapImgRes, EguiMapImgResImpl};
+use view::{
+    clip_from_top_key,
+    egui::{EguiMapImgRes, EguiMapImgResImpl},
+};
 
 fn main() {
     let rc = Arc::new("value");
@@ -88,21 +91,21 @@ impl EguiMap for MapViewState {
             let screen_zoom = (TILE_SIZE * 2.0_f64.powf(self.zoom_lvl - k.depth() as f64)) as f32;
             let ltpos = Pos2::new(lt[0] as f32, lt[1] as f32) + rect.min.to_vec2();
             let this_rect = Rect::from_min_size(ltpos, vec2(screen_zoom, screen_zoom));
-            let tile = res.get(k, self_ref.clone(), ui.ctx());
-            let parent_tile = if let Some(k) = k.parent() {
-                res.get(k, self_ref.clone(), ui.ctx())
-            } else {
-                None
-            };
-            let use_parent = parent_tile.is_some() && k.x() % 2 == 0 && k.y() % 2 == 0;
+            let mut tile = res.get(k, self_ref.clone(), ui.ctx());
+            //tile对应的key
+            let mut k1 = Some(k);
+            while tile.is_none() && k1.is_some() {
+                k1 = k1.unwrap().parent();
+                if let Some(k1) = k1 {
+                    tile = res.get(k1, self_ref.clone(), ui.ctx());
+                    if let Some(t) = tile {
+                        tile = Some(t.clip(clip_from_top_key(k1, k)));
+                    }
+                }
+            }
             if let Some(t) = tile {
                 t.draw(&painter, this_rect);
-            } else if use_parent {
-                parent_tile.unwrap().draw(
-                    &painter,
-                    Rect::from_min_size(ltpos, vec2(screen_zoom * 2.0, screen_zoom * 2.0)),
-                );
-            } else if parent_tile.is_none() {
+            } else {
                 painter.rect_filled(
                     this_rect,
                     Rounding::ZERO,
