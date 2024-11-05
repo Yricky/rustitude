@@ -6,3 +6,5 @@ edition = "2021"
 [lib]
 
 [dependencies]
+egui.workspace = true
+rustitude_base = { version = "0.1.0", path = "../base" }

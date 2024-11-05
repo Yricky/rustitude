@@ -1,88 +1,20 @@
 use std::{
     cell::OnceCell,
-    fs,
-    sync::{Arc, Mutex, MutexGuard, RwLock},
+    fs::{self, File},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use egui::{
-    load::{BytesLoader, SizedTexture, TexturePoll},
-    pos2, vec2, Color32, Context, Image, Painter, Rect, Vec2,
+    load::{BytesLoader, TexturePoll},
+    Context, Image,
 };
+use emap::{CommonEguiDrawable, EguiMapImgRes, TILE_SIZE_VEC2};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustitude_base::{curr_time_millis, map_view_state::MapViewState, qtree::QTreeKey};
 
 use crate::view::priv_fn::build_req;
 
-pub const TILE_SIZE_VEC2: Vec2 = vec2(256.0, 256.0);
-
-pub trait EguiDrawable: Send + Sync {
-    fn draw(&self, painter: &Painter, rect: Rect);
-    fn clip(&self, rect: Rect) -> CommonEguiDrawable;
-}
-
-type CommonEguiDrawable = Arc<dyn EguiDrawable>;
 type HotMap = Arc<Mutex<FxHashMap<QTreeKey, u128>>>;
-
-trait CleanLock<T> {
-    fn clean_lock(&self) -> MutexGuard<'_, T>;
-}
-
-impl<T> CleanLock<T> for Mutex<T> {
-    fn clean_lock(&self) -> MutexGuard<'_, T> {
-        if self.is_poisoned() {
-            self.clear_poison();
-        }
-        self.lock().unwrap()
-    }
-}
-
-pub trait EguiMapImgRes {
-    fn get(&self, key: QTreeKey) -> Option<CommonEguiDrawable>;
-
-    fn get_or_update(
-        &self,
-        key: QTreeKey,
-        mvs: Arc<RwLock<MapViewState>>,
-        ctx: &Context,
-    ) -> Option<CommonEguiDrawable>;
-}
-
-impl EguiDrawable for SizedTexture {
-    fn draw(&self, painter: &Painter, rect: Rect) {
-        painter.image(
-            self.id,
-            rect,
-            Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-            Color32::WHITE,
-        );
-    }
-
-    fn clip(&self, rect: Rect) -> CommonEguiDrawable {
-        let d = (self.clone(), rect);
-        Arc::new(d)
-    }
-}
-
-impl EguiDrawable for (SizedTexture, Rect) {
-    fn draw(&self, painter: &Painter, rect: Rect) {
-        painter.image(self.0.id, rect, self.1, Color32::WHITE);
-    }
-
-    fn clip(&self, rect: Rect) -> CommonEguiDrawable {
-        let self_size = self.1.size();
-        let rect_size = rect.size();
-        Arc::new((
-            self.0,
-            Rect::from_min_size(
-                pos2(
-                    self.1.min.x + self_size.x * rect.min.x,
-                    self.1.min.y + self_size.y * rect.min.y,
-                ),
-                vec2(self_size.x * rect_size.x, self_size.y * rect_size.y),
-            ),
-        ))
-    }
-}
 
 #[derive(Clone)]
 pub struct EguiMapImgResImpl {
@@ -160,7 +92,8 @@ impl EguiMapImgRes for EguiMapImgResImpl {
                     rb = mvs.bottom_right_key();
                 }
                 if z == lt.depth() && lt.x() <= x && x <= rb.x() && lt.y() <= y && y <= rb.y() {
-                    s.load_img(key, c.clone(), tfp);
+                    let vec = fs::read(tfp.as_str()).unwrap();
+                    s.load_img(key, c.clone(), vec);
                     c.request_repaint();
                 }
             });
@@ -180,7 +113,7 @@ impl EguiMapImgRes for EguiMapImgResImpl {
                 if z == lt.depth() && lt.x() <= x && x <= rb.x() && lt.y() <= y && y <= rb.y() {
                     let lock_file_path =
                         format!("tiles/{}/{}_{}_{}.png.tmp", typ.as_str(), z, x, y);
-                    // println!("fetch:{}_{}_{}", z, x, y);
+                    println!("fetch:{}_{}_{}", z, x, y);
                     let req = build_req(typ.as_str(), x, y, z);
                     let resp = ehttp::fetch_blocking(&req);
                     if let Ok(r) = resp {
@@ -191,7 +124,8 @@ impl EguiMapImgRes for EguiMapImgResImpl {
                             }
                             fs::write(lock_file_path.clone(), r.bytes).unwrap();
                             let _ = fs::rename(lock_file_path, tile_file_path.as_str());
-                            s.load_img(key, c.clone(), tile_file_path);
+                            let vec = fs::read(tile_file_path.as_str()).unwrap();
+                            s.load_img(key, c.clone(), vec);
                             c.request_repaint();
                         } else {
                             println!("resp status:{}", r.status);
@@ -212,10 +146,9 @@ impl EguiMapImgRes for EguiMapImgResImpl {
 }
 
 impl EguiMapImgResImpl {
-    fn load_img(self: &Self, key: QTreeKey, ctx: Context, tfp: String) {
+    fn load_img(self: &Self, key: QTreeKey, ctx: Context, vec: Vec<u8>) {
         let dm = self.data_map.clone();
         let hm = self.hot_map.clone();
-        let vec = fs::read(tfp.clone()).unwrap();
         let uri = self.uri_of(key);
         let img = Image::from_bytes(uri, vec);
         if let Ok(r) = img.load_for_size(&ctx, TILE_SIZE_VEC2) {
@@ -225,7 +158,7 @@ impl EguiMapImgResImpl {
                     m.insert(key, Arc::new(texture));
                 }
                 let time = curr_time_millis();
-                let mut hot_map = hm.clean_lock();
+                let mut hot_map = hm.lock().unwrap();
                 hot_map.insert(key, time);
                 let mut will_del: Vec<QTreeKey> = vec![];
                 if hot_map.len() > 500 {
