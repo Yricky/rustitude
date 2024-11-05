@@ -1,6 +1,6 @@
 use std::{
     cell::OnceCell,
-    fs::{self, File},
+    fs::{self},
     sync::{Arc, Mutex, RwLock},
 };
 
@@ -8,7 +8,10 @@ use egui::{
     load::{BytesLoader, TexturePoll},
     Context, Image,
 };
-use emap::{CommonEguiDrawable, EguiMapImgRes, TILE_SIZE_VEC2};
+use emap::{
+    tile_drawable::{CommonEguiTileDrawable, TILE_SIZE_VEC2},
+    EguiMapImgRes,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustitude_base::{curr_time_millis, map_view_state::MapViewState, qtree::QTreeKey};
 
@@ -19,7 +22,7 @@ type HotMap = Arc<Mutex<FxHashMap<QTreeKey, u128>>>;
 #[derive(Clone)]
 pub struct EguiMapImgResImpl {
     pub typ: String,
-    pub data_map: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiDrawable>>>,
+    pub data_map: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
     pub rt: Arc<tokio::runtime::Runtime>,
     pub loading_lock: Arc<RwLock<FxHashSet<u64>>>,
     hot_map: HotMap,
@@ -52,7 +55,7 @@ impl EguiMapImgResImpl {
 }
 
 impl EguiMapImgRes for EguiMapImgResImpl {
-    fn get(&self, key: QTreeKey) -> Option<CommonEguiDrawable> {
+    fn get(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable> {
         if let Some(img) = self.data_map.read().unwrap().get(&key) {
             if let Ok(mut hm) = self.hot_map.try_lock() {
                 hm.insert(key, curr_time_millis());
@@ -67,7 +70,7 @@ impl EguiMapImgRes for EguiMapImgResImpl {
         key: QTreeKey,
         mvs: Arc<RwLock<MapViewState>>,
         ctx: &Context,
-    ) -> Option<CommonEguiDrawable> {
+    ) -> Option<CommonEguiTileDrawable> {
         let weak = self.get(key);
         if weak.is_some() {
             return weak;

@@ -1,6 +1,6 @@
 use std::sync::{Arc, RwLock};
 pub mod view;
-use egui::Margin;
+use egui::{Margin, Rect, Sense};
 use emap::{egui_map::EguiMap, EguiMapImgRes};
 use rustitude_base::{map_state::Location, map_view_state::MapViewState};
 use view::egui::EguiMapImgResImpl;

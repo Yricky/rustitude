@@ -1,18 +1,16 @@
 use std::sync::{Arc, RwLock};
 
-use egui::{
-    load::BytesLoader, vec2, Align2, Color32, FontId, Painter, Pos2, Rect, Rounding, Sense, Stroke,
-};
+use egui::{load::BytesLoader, vec2, Color32, Painter, Pos2, Rect, Rounding, Sense, Stroke};
 use rustitude_base::{
     map_state::{walk, Location},
     map_view_state::{MapViewState, TILE_SIZE},
 };
 
-use crate::{clip_from_top_key, EguiMapImgRes};
+use crate::{clip_from_top_key, tile_drawable::EguiTileDrawable, EguiMapImgRes};
 
 pub trait EguiMap {
     fn egui_map(
-        self: &mut Self,
+        self: &Self,
         ui: &mut egui::Ui,
         res: Arc<dyn EguiMapImgRes>,
         other_res: &Vec<Arc<dyn EguiMapImgRes>>,
@@ -56,7 +54,7 @@ pub trait EguiMap {
                 if let Some(k1) = k1 {
                     tile = res.get(k1);
                     if let Some(t) = tile {
-                        tile = Some(t.clip(clip_from_top_key(k1, k)));
+                        tile = t.clip(clip_from_top_key(k1, k));
                     }
                 }
             }
@@ -84,16 +82,7 @@ pub trait EguiMap {
                 }
             });
             if debug {
-                painter.text(
-                    ltpos,
-                    Align2::LEFT_TOP,
-                    format!("{}", k),
-                    FontId {
-                        size: 8.0,
-                        family: egui::FontFamily::Monospace,
-                    },
-                    Color32::from_gray(0xff),
-                );
+                k.draw(&painter, this_rect);
             }
         });
         if debug {
