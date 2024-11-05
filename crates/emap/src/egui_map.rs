@@ -1,19 +1,21 @@
 use std::sync::{Arc, RwLock};
 
-use egui::{load::BytesLoader, vec2, Color32, Painter, Pos2, Rect, Rounding, Sense, Stroke};
+use egui::{
+    load::BytesLoader, vec2, Color32, InnerResponse, Painter, Pos2, Rect, Rounding, Sense, Stroke,
+};
 use rustitude_base::{
     map_state::{walk, Location},
     map_view_state::{MapViewState, TILE_SIZE},
 };
 
-use crate::{clip_from_top_key, tile_drawable::EguiTileDrawable, EguiMapImgRes};
+use crate::{clip_from_top_key, EguiMapTileRes};
 
 pub trait EguiMap {
     fn egui_map(
         self: &Self,
         ui: &mut egui::Ui,
-        res: Arc<dyn EguiMapImgRes>,
-        other_res: &Vec<Arc<dyn EguiMapImgRes>>,
+        res: Arc<dyn EguiMapTileRes>,
+        other_res: &Vec<Arc<dyn EguiMapTileRes>>,
         debug: bool,
     ) -> egui::Response {
         let rect = ui.available_rect_before_wrap();
@@ -40,51 +42,14 @@ pub trait EguiMap {
                 mvs_central.y - (scroll.y as f64) / (TILE_SIZE * mvs_zoom),
             ));
         }
-
-        walk(mvs.top_left_key(), mvs.bottom_right_key()).for_each(|k| {
-            let lt = mvs.location_to_view_pos(Location::from_qtree_key(k));
-            let screen_zoom = (TILE_SIZE * 2.0_f64.powf(mvs.zoom_lvl - k.depth() as f64)) as f32;
-            let ltpos = Pos2::new(lt[0] as f32, lt[1] as f32) + rect.min.to_vec2();
-            let this_rect = Rect::from_min_size(ltpos, vec2(screen_zoom, screen_zoom));
-            let mut tile = res.get_or_update(k, self.map_view_state(), ui.ctx());
-            //tile对应的key
-            let mut k1 = Some(k);
-            while tile.is_none() && k1.is_some() {
-                k1 = k1.unwrap().parent();
-                if let Some(k1) = k1 {
-                    tile = res.get(k1);
-                    if let Some(t) = tile {
-                        tile = t.clip(clip_from_top_key(k1, k));
-                    }
-                }
-            }
-            if let Some(t) = tile {
-                t.draw(&painter, this_rect);
-            } else {
-                painter.rect_filled(
-                    this_rect,
-                    Rounding::ZERO,
-                    Color32::from_rgb(
-                        k.depth() * 8,
-                        0xff - k.depth() * 8,
-                        if (k.x() + k.y()) % 2 == 0 {
-                            k.depth()
-                        } else {
-                            0xff - k.depth()
-                        },
-                    ),
-                );
-            }
-            other_res.iter().for_each(|r| {
-                let tile = r.get_or_update(k, self.map_view_state(), ui.ctx());
-                if let Some(t) = tile {
-                    t.draw(&painter, this_rect);
-                }
-            });
-            if debug {
-                k.draw(&painter, this_rect);
-            }
-        });
+        emap_default_impl_draw_map_tile(
+            ui,
+            &painter,
+            &mut mvs,
+            self.map_view_state(),
+            res,
+            other_res,
+        );
         if debug {
             painter.rect_stroke(
                 rect.shrink(1.0),
@@ -110,45 +75,9 @@ pub trait EguiMap {
                 ui.label(format!("Zoom delta:{}", zoom));
                 ui.label(format!("Click:{}", click));
                 ui.label("--------------------");
-                ui.label(format!("Center:{}", mvs.central));
-                ui.label(format!("Zoom level:{}", mvs.zoom_lvl as u8));
-                ui.label(format!("Top left:{}", mvs.top_left_key()));
-                ui.label(format!("Bottom right:{}", mvs.bottom_right_key()));
+                emap_debug_mvs(ui, &mvs);
                 ui.label("--------------------");
-                ui.label(format!(
-                    "include_mem:{}",
-                    ui.ctx().loaders().include.byte_size()
-                ));
-                ui.label(format!(
-                    "texture_mem:{}",
-                    ui.ctx()
-                        .loaders()
-                        .texture
-                        .lock()
-                        .iter()
-                        .map(|l| l.byte_size())
-                        .sum::<usize>()
-                ));
-                ui.label(format!(
-                    "bytes_mem:{}",
-                    ui.ctx()
-                        .loaders()
-                        .bytes
-                        .lock()
-                        .iter()
-                        .map(|l| l.byte_size())
-                        .sum::<usize>()
-                ));
-                ui.label(format!(
-                    "image_mem:{}",
-                    ui.ctx()
-                        .loaders()
-                        .image
-                        .lock()
-                        .iter()
-                        .map(|l| l.byte_size())
-                        .sum::<usize>()
-                ));
+                emap_debug_loader_size(ui);
             });
         }
         ui.allocate_rect(rect, Sense::click_and_drag())
@@ -157,8 +86,101 @@ pub trait EguiMap {
     fn map_view_state(&self) -> Arc<RwLock<MapViewState>>;
 }
 
-impl EguiMap for Arc<RwLock<MapViewState>> {
-    fn map_view_state(&self) -> Arc<RwLock<MapViewState>> {
-        self.clone()
-    }
+pub fn emap_default_impl_draw_map_tile(
+    ui: &mut egui::Ui,
+    painter: &Painter,
+    mvs: &MapViewState,
+    mvs_ref: Arc<RwLock<MapViewState>>,
+    res: Arc<dyn EguiMapTileRes>,
+    other_res: &Vec<Arc<dyn EguiMapTileRes>>,
+) {
+    walk(mvs.top_left_key(), mvs.bottom_right_key()).for_each(|k| {
+        let lt = mvs.location_to_view_pos(Location::from_qtree_key(k));
+        let screen_zoom = (TILE_SIZE * 2.0_f64.powf(mvs.zoom_lvl - k.depth() as f64)) as f32;
+        let ltpos = Pos2::new(lt[0] as f32, lt[1] as f32) + painter.clip_rect().min.to_vec2();
+        let this_rect = Rect::from_min_size(ltpos, vec2(screen_zoom, screen_zoom));
+        let mut tile = res.get_or_update(k, mvs_ref.clone(), ui.ctx());
+        //tile对应的key
+        let mut tile_key = Some(k);
+        while tile.is_none() && tile_key.is_some() {
+            tile_key = tile_key.unwrap().parent();
+            if let Some(k1) = tile_key {
+                tile = res.get(k1);
+                if let Some(t) = tile {
+                    tile = t.clip(clip_from_top_key(k1, k));
+                }
+            }
+        }
+        if let Some(t) = tile {
+            t.draw(&painter, this_rect);
+        } else {
+            painter.rect_filled(
+                this_rect,
+                Rounding::ZERO,
+                Color32::from_rgb(
+                    k.depth() * 8,
+                    0xff - k.depth() * 8,
+                    if (k.x() + k.y()) % 2 == 0 {
+                        k.depth()
+                    } else {
+                        0xff - k.depth()
+                    },
+                ),
+            );
+        }
+        other_res.iter().for_each(|r| {
+            let tile = r.get_or_update(k, mvs_ref.clone(), ui.ctx());
+            if let Some(t) = tile {
+                t.draw(&painter, this_rect);
+            }
+        });
+    });
+}
+
+pub fn emap_debug_mvs(ui: &mut egui::Ui, mvs: &MapViewState) -> InnerResponse<()> {
+    ui.vertical(|ui| {
+        ui.label(format!("Center:{}", mvs.central));
+        ui.label(format!("Zoom level:{}", mvs.zoom_lvl as u8));
+        ui.label(format!("Top left:{}", mvs.top_left_key()));
+        ui.label(format!("Bottom right:{}", mvs.bottom_right_key()));
+    })
+}
+
+pub fn emap_debug_loader_size(ui: &mut egui::Ui) -> InnerResponse<()> {
+    ui.vertical(|ui| {
+        ui.label(format!(
+            "include_mem:{}",
+            ui.ctx().loaders().include.byte_size()
+        ));
+        ui.label(format!(
+            "texture_mem:{}",
+            ui.ctx()
+                .loaders()
+                .texture
+                .lock()
+                .iter()
+                .map(|l| l.byte_size())
+                .sum::<usize>()
+        ));
+        ui.label(format!(
+            "bytes_mem:{}",
+            ui.ctx()
+                .loaders()
+                .bytes
+                .lock()
+                .iter()
+                .map(|l| l.byte_size())
+                .sum::<usize>()
+        ));
+        ui.label(format!(
+            "image_mem:{}",
+            ui.ctx()
+                .loaders()
+                .image
+                .lock()
+                .iter()
+                .map(|l| l.byte_size())
+                .sum::<usize>()
+        ));
+    })
 }

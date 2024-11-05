@@ -1,7 +1,7 @@
 use std::sync::{Arc, RwLock};
 pub mod view;
-use egui::{Margin, Rect, Sense};
-use emap::{egui_map::EguiMap, EguiMapImgRes};
+use egui::Margin;
+use emap::{egui_map::EguiMap, DebugPrintKeyTileRes, EguiMapTileRes};
 use rustitude_base::{map_state::Location, map_view_state::MapViewState};
 use view::egui::EguiMapImgResImpl;
 
@@ -33,9 +33,15 @@ fn main() {
 
 struct MapViewStateTestApp {
     map_view_state: Arc<RwLock<MapViewState>>,
-    main_res: Arc<dyn EguiMapImgRes>,
-    other_res: Vec<Arc<dyn EguiMapImgRes>>,
+    main_res: Arc<dyn EguiMapTileRes>,
+    other_res: Vec<Arc<dyn EguiMapTileRes>>,
     debug: bool,
+}
+
+impl EguiMap for MapViewStateTestApp {
+    fn map_view_state(&self) -> Arc<RwLock<MapViewState>> {
+        self.map_view_state.clone()
+    }
 }
 
 impl eframe::App for MapViewStateTestApp {
@@ -47,12 +53,12 @@ impl eframe::App for MapViewStateTestApp {
                     ui.label(format!("cpuTime:{}ms", cpu_usage * 1000.0));
                 }
                 ui.checkbox(&mut self.debug, "debug");
-                self.map_view_state.egui_map(
-                    ui,
-                    self.main_res.clone(),
-                    &self.other_res,
-                    self.debug,
-                );
+                if self.debug && self.other_res.len() == 2 {
+                    self.other_res.push(Arc::new(DebugPrintKeyTileRes));
+                } else if !self.debug && self.other_res.len() == 3 {
+                    self.other_res.pop();
+                }
+                self.egui_map(ui, self.main_res.clone(), &self.other_res, self.debug);
             });
     }
 }

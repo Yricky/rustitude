@@ -10,7 +10,7 @@ use egui::{
 };
 use emap::{
     tile_drawable::{CommonEguiTileDrawable, TILE_SIZE_VEC2},
-    EguiMapImgRes,
+    EguiMapTileRes,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustitude_base::{curr_time_millis, map_view_state::MapViewState, qtree::QTreeKey};
@@ -54,7 +54,7 @@ impl EguiMapImgResImpl {
     }
 }
 
-impl EguiMapImgRes for EguiMapImgResImpl {
+impl EguiMapTileRes for EguiMapImgResImpl {
     fn get(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable> {
         if let Some(img) = self.data_map.read().unwrap().get(&key) {
             if let Ok(mut hm) = self.hot_map.try_lock() {
@@ -79,13 +79,16 @@ impl EguiMapImgRes for EguiMapImgResImpl {
         let x = key.x();
         let y = key.y();
         let tile_file_path = format!("tiles/{}/{}_{}_{}.png", self.typ.as_str(), z, x, y);
-        let mut lock = self.loading_lock.write().unwrap();
+        let mut loading_locks = self.loading_lock.write().unwrap();
         let send_lock = self.loading_lock.clone();
         let c = ctx.clone();
-        if fs::exists(tile_file_path.as_str()).unwrap() {
+        let s = self.clone();
+        let is_loading = loading_locks.contains(&key.inner_key());
+        if is_loading {
+            return None;
+        } else if fs::exists(tile_file_path.as_str()).unwrap_or(false) {
+            loading_locks.insert(key.inner_key());
             let tfp = tile_file_path;
-            let c = ctx.clone();
-            let s = self.clone();
             self.rt.spawn(async move {
                 let lt;
                 let rb;
@@ -95,16 +98,18 @@ impl EguiMapImgRes for EguiMapImgResImpl {
                     rb = mvs.bottom_right_key();
                 }
                 if z == lt.depth() && lt.x() <= x && x <= rb.x() && lt.y() <= y && y <= rb.y() {
-                    let vec = fs::read(tfp.as_str()).unwrap();
-                    s.load_img(key, c.clone(), vec);
+                    let vec = fs::read(tfp.as_str()).unwrap_or(vec![]);
+                    if !s.load_img(key, c.clone(), vec) {
+                        let _ = fs::remove_file(tfp.as_str());
+                    }
                     c.request_repaint();
                 }
+                send_lock.write().unwrap().remove(&key.inner_key());
             });
             return None;
-        } else if !lock.contains(&key.inner_key()) {
-            lock.insert(key.inner_key());
+        } else {
+            loading_locks.insert(key.inner_key());
             let typ = self.typ.clone();
-            let s = self.clone();
             self.rt.spawn(async move {
                 let lt;
                 let rb;
@@ -116,19 +121,21 @@ impl EguiMapImgRes for EguiMapImgResImpl {
                 if z == lt.depth() && lt.x() <= x && x <= rb.x() && lt.y() <= y && y <= rb.y() {
                     let lock_file_path =
                         format!("tiles/{}/{}_{}_{}.png.tmp", typ.as_str(), z, x, y);
-                    println!("fetch:{}_{}_{}", z, x, y);
+                    // println!("fetch:{}_{}_{}", z, x, y);
                     let req = build_req(typ.as_str(), x, y, z);
                     let resp = ehttp::fetch_blocking(&req);
                     if let Ok(r) = resp {
                         if r.status == 200 {
                             let path = format!("tiles/{}", typ.as_str());
-                            if !fs::exists(path.as_str()).unwrap() {
+                            if !fs::exists(path.as_str()).unwrap_or(false) {
                                 let _ = fs::create_dir_all(path.as_str());
                             }
                             fs::write(lock_file_path.clone(), r.bytes).unwrap();
                             let _ = fs::rename(lock_file_path, tile_file_path.as_str());
-                            let vec = fs::read(tile_file_path.as_str()).unwrap();
-                            s.load_img(key, c.clone(), vec);
+                            let vec = fs::read(tile_file_path.as_str()).unwrap_or(vec![]);
+                            if !s.load_img(key, c.clone(), vec) {
+                                let _ = fs::remove_file(tile_file_path.as_str());
+                            }
                             c.request_repaint();
                         } else {
                             println!("resp status:{}", r.status);
@@ -142,66 +149,89 @@ impl EguiMapImgRes for EguiMapImgResImpl {
                 send_lock.write().unwrap().remove(&key.inner_key());
             });
             return None;
-        } else {
-            return None;
         }
     }
 }
 
 impl EguiMapImgResImpl {
-    fn load_img(self: &Self, key: QTreeKey, ctx: Context, vec: Vec<u8>) {
+    fn load_img(self: &Self, key: QTreeKey, ctx: Context, vec: Vec<u8>) -> bool {
         let dm = self.data_map.clone();
         let hm = self.hot_map.clone();
         let uri = self.uri_of(key);
         let img = Image::from_bytes(uri, vec);
-        if let Ok(r) = img.load_for_size(&ctx, TILE_SIZE_VEC2) {
-            if let TexturePoll::Ready { texture } = r {
-                {
-                    let mut m = dm.write().unwrap();
-                    m.insert(key, Arc::new(texture));
-                }
-                let time = curr_time_millis();
-                let mut hot_map = hm.lock().unwrap();
-                hot_map.insert(key, time);
-                let mut will_del: Vec<QTreeKey> = vec![];
-                if hot_map.len() > 500 {
-                    hot_map.iter().for_each(|t| {
-                        if t.0.depth() > 3 && time.checked_sub(t.1.clone()).unwrap_or(0) > 20_000 {
-                            will_del.push(t.0.clone());
-                        }
-                    });
-                    if will_del.len() > 0 {
-                        {
-                            let mut m = dm.write().unwrap();
-                            will_del.iter().for_each(|k| {
-                                m.remove(k);
-                            });
-                        }
-                        will_del.iter().for_each(|k| {
-                            hot_map.remove(k);
-                            let uri = self.uri_of(k.clone());
-                            ctx.loaders().include.forget(&uri);
-                            ctx.loaders()
-                                .bytes
-                                .lock()
-                                .iter()
-                                .for_each(|l| l.forget(&uri));
-                            ctx.loaders()
-                                .image
-                                .lock()
-                                .iter()
-                                .for_each(|l| l.forget(&uri));
-                            ctx.loaders()
-                                .texture
-                                .lock()
-                                .iter()
-                                .for_each(|l| l.forget(&uri));
-                        });
-                        println!("del:{}", will_del.len());
+        match img.load_for_size(&ctx, TILE_SIZE_VEC2) {
+            Ok(r) => {
+                if let TexturePoll::Ready { texture } = r {
+                    {
+                        let mut m = dm.write().unwrap();
+                        m.insert(key, Arc::new(texture));
                     }
+                    let time = curr_time_millis();
+                    let mut hot_map = hm.lock().unwrap();
+                    hot_map.insert(key, time);
+                    let mut will_del: Vec<QTreeKey> = vec![];
+                    if hot_map.len() > 500 {
+                        hot_map.iter().for_each(|t| {
+                            if t.0.depth() > 3
+                                && time.checked_sub(t.1.clone()).unwrap_or(0) > 20_000
+                            {
+                                will_del.push(t.0.clone());
+                            }
+                        });
+                        if will_del.len() > 0 {
+                            self.remove_img_cache(&ctx, dm, &mut hot_map, &mut will_del);
+                            println!("del:{}", will_del.len());
+                        }
+                    }
+                }
+                true
+            }
+            Err(e) => {
+                let mut hot_map = hm.lock().unwrap();
+                let mut will_del: Vec<QTreeKey> = vec![key];
+                self.remove_img_cache(&ctx, dm, &mut hot_map, &mut will_del);
+                println!("load_img error:{}", e);
+                match e {
+                    egui::load::LoadError::Loading(_) => true,
+                    _ => false,
                 }
             }
         }
+    }
+
+    fn remove_img_cache(
+        self: &Self,
+        ctx: &Context,
+        dm: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
+        hot_map: &mut FxHashMap<QTreeKey, u128>,
+        will_del: &mut Vec<QTreeKey>,
+    ) {
+        {
+            let mut m = dm.write().unwrap();
+            will_del.iter().for_each(|k| {
+                m.remove(k);
+            });
+        }
+        will_del.iter().for_each(|k| {
+            hot_map.remove(k);
+            let uri = self.uri_of(k.clone());
+            ctx.loaders().include.forget(&uri);
+            ctx.loaders()
+                .bytes
+                .lock()
+                .iter()
+                .for_each(|l| l.forget(&uri));
+            ctx.loaders()
+                .image
+                .lock()
+                .iter()
+                .for_each(|l| l.forget(&uri));
+            ctx.loaders()
+                .texture
+                .lock()
+                .iter()
+                .for_each(|l| l.forget(&uri));
+        });
     }
 
     fn uri_of(&self, key: QTreeKey) -> String {

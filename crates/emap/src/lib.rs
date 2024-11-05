@@ -10,7 +10,7 @@ use egui::{pos2, vec2, Context, Rect};
 use rustitude_base::{map_view_state::MapViewState, qtree::QTreeKey};
 use tile_drawable::CommonEguiTileDrawable;
 
-pub trait EguiMapImgRes {
+pub trait EguiMapTileRes {
     fn get(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable>;
 
     fn get_or_update(
@@ -19,6 +19,22 @@ pub trait EguiMapImgRes {
         mvs: Arc<RwLock<MapViewState>>,
         ctx: &Context,
     ) -> Option<CommonEguiTileDrawable>;
+}
+
+pub struct DebugPrintKeyTileRes;
+impl EguiMapTileRes for DebugPrintKeyTileRes {
+    fn get(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable> {
+        Some(Arc::new(key))
+    }
+
+    fn get_or_update(
+        &self,
+        key: QTreeKey,
+        _mvs: Arc<RwLock<MapViewState>>,
+        _ctx: &Context,
+    ) -> Option<CommonEguiTileDrawable> {
+        Some(Arc::new(key))
+    }
 }
 
 pub fn clip_from_top_key(top_key: QTreeKey, key: QTreeKey) -> Rect {
