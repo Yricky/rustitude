@@ -37,7 +37,9 @@ impl<T> CleanLock<T> for Mutex<T> {
 }
 
 pub trait EguiMapImgRes {
-    fn get(
+    fn get(&self, key: QTreeKey) -> Option<CommonEguiDrawable>;
+
+    fn get_or_update(
         &self,
         key: QTreeKey,
         mvs: Arc<RwLock<MapViewState>>,
@@ -118,17 +120,25 @@ impl EguiMapImgResImpl {
 }
 
 impl EguiMapImgRes for EguiMapImgResImpl {
-    fn get(
-        &self,
-        key: QTreeKey,
-        mvs: Arc<RwLock<MapViewState>>,
-        ctx: &Context,
-    ) -> Option<CommonEguiDrawable> {
+    fn get(&self, key: QTreeKey) -> Option<CommonEguiDrawable> {
         if let Some(img) = self.data_map.read().unwrap().get(&key) {
             if let Ok(mut hm) = self.hot_map.try_lock() {
                 hm.insert(key, curr_time_millis());
             }
             return Some(img.clone());
+        }
+        return None;
+    }
+
+    fn get_or_update(
+        &self,
+        key: QTreeKey,
+        mvs: Arc<RwLock<MapViewState>>,
+        ctx: &Context,
+    ) -> Option<CommonEguiDrawable> {
+        let weak = self.get(key);
+        if weak.is_some() {
+            return weak;
         }
         let z = key.depth();
         let x = key.x();

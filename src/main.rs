@@ -88,13 +88,13 @@ impl EguiMap for MapViewState {
             let screen_zoom = (TILE_SIZE * 2.0_f64.powf(self.zoom_lvl - k.depth() as f64)) as f32;
             let ltpos = Pos2::new(lt[0] as f32, lt[1] as f32) + rect.min.to_vec2();
             let this_rect = Rect::from_min_size(ltpos, vec2(screen_zoom, screen_zoom));
-            let mut tile = res.get(k, self_ref.clone(), ui.ctx());
+            let mut tile = res.get_or_update(k, self_ref.clone(), ui.ctx());
             //tile对应的key
             let mut k1 = Some(k);
             while tile.is_none() && k1.is_some() {
                 k1 = k1.unwrap().parent();
                 if let Some(k1) = k1 {
-                    tile = res.get(k1, self_ref.clone(), ui.ctx());
+                    tile = res.get(k1);
                     if let Some(t) = tile {
                         tile = Some(t.clip(clip_from_top_key(k1, k)));
                     }
@@ -118,7 +118,7 @@ impl EguiMap for MapViewState {
                 );
             }
             other_res.iter().for_each(|r| {
-                let tile = r.get(k, self_ref.clone(), ui.ctx());
+                let tile = r.get_or_update(k, self_ref.clone(), ui.ctx());
                 if let Some(t) = tile {
                     t.draw(&painter, this_rect);
                 }
