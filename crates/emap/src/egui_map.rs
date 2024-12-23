@@ -105,7 +105,7 @@ pub fn emap_default_impl_draw_map_tile(
         while tile.is_none() && tile_key.is_some() {
             tile_key = tile_key.unwrap().parent();
             if let Some(k1) = tile_key {
-                tile = res.get(k1);
+                tile = res.get_memory_cache(k1);
                 if let Some(t) = tile {
                     tile = t.clip(clip_from_top_key(k1, k));
                 }

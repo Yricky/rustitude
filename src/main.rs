@@ -20,10 +20,10 @@ fn main() {
                     view_size: [1280.0, 800.0],
                     zoom_lvl: 2.0,
                 })),
-                main_res: Arc::new(EguiMapImgResImpl::new("img")),
+                main_res: Arc::new(EguiMapImgResImpl::new("img", Some("tiles"))),
                 other_res: vec![
-                    Arc::new(EguiMapImgResImpl::new("cia")),
-                    Arc::new(EguiMapImgResImpl::new("cva")),
+                    Arc::new(EguiMapImgResImpl::new("cia", Some("tiles"))),
+                    Arc::new(EguiMapImgResImpl::new("cva", Some("tiles"))),
                 ],
                 debug: false,
             }))

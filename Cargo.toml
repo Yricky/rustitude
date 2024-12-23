@@ -20,12 +20,12 @@ image.workspace = true
 members = ["crates/base", "crates/emap"]
 
 [workspace.dependencies]
-eframe = { version = "0.29.1" }
-egui = "0.29.1"
-egui_extras = { version = "0.29.1", features = ["image"] }
+eframe = { version = "0.30.0" }
+egui = "0.30.0"
+egui_extras = { version = "0.30.0", features = ["image"] }
 ehttp = { version = "0.5.0", features = [] }
 image = { version = "0.25.4", features = ["png"] }
-rustc-hash = "2.0.0"
+rustc-hash = "2.1.0"
 tokio = { version = "1.41.0", features = ["rt-multi-thread"] }
 rustitude_base = { version = "0.1.0", path = "crates/base" }
 emap = { version = "0.1.0", path = "crates/emap" }

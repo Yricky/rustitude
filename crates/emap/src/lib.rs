@@ -11,7 +11,7 @@ use rustitude_base::{map_view_state::MapViewState, qtree::QTreeKey};
 use tile_drawable::CommonEguiTileDrawable;
 
 pub trait EguiMapTileRes {
-    fn get(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable>;
+    fn get_memory_cache(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable>;
 
     fn get_or_update(
         &self,
@@ -23,7 +23,7 @@ pub trait EguiMapTileRes {
 
 pub struct DebugPrintKeyTileRes;
 impl EguiMapTileRes for DebugPrintKeyTileRes {
-    fn get(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable> {
+    fn get_memory_cache(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable> {
         Some(Arc::new(key))
     }
 
