@@ -99,7 +99,7 @@ pub fn emap_default_impl_draw_map_tile(
         let screen_zoom = (TILE_SIZE * 2.0_f64.powf(mvs.zoom_lvl - k.depth() as f64)) as f32;
         let ltpos = Pos2::new(lt[0] as f32, lt[1] as f32) + painter.clip_rect().min.to_vec2();
         let this_rect = Rect::from_min_size(ltpos, vec2(screen_zoom, screen_zoom));
-        let mut tile = res.get_or_update(k, mvs_ref.clone(), ui.ctx());
+        let mut tile = res.get_or_fetch(k, mvs_ref.clone(), ui.ctx());
         //tile对应的key
         let mut tile_key = Some(k);
         while tile.is_none() && tile_key.is_some() {
@@ -129,7 +129,7 @@ pub fn emap_default_impl_draw_map_tile(
             );
         }
         other_res.iter().for_each(|r| {
-            let tile = r.get_or_update(k, mvs_ref.clone(), ui.ctx());
+            let tile = r.get_or_fetch(k, mvs_ref.clone(), ui.ctx());
             if let Some(t) = tile {
                 t.draw(&painter, this_rect);
             }

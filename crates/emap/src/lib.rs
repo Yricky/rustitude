@@ -11,9 +11,11 @@ use rustitude_base::{map_view_state::MapViewState, qtree::QTreeKey};
 use tile_drawable::CommonEguiTileDrawable;
 
 pub trait EguiMapTileRes {
+    /// 获取内存缓存，没有就算了
     fn get_memory_cache(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable>;
 
-    fn get_or_update(
+    /// 获取内存缓存，若没有内存缓存，就异步获取，并在异步完成后调用ctx的request_repaint
+    fn get_or_fetch(
         &self,
         key: QTreeKey,
         mvs: Arc<RwLock<MapViewState>>,
@@ -27,7 +29,7 @@ impl EguiMapTileRes for DebugPrintKeyTileRes {
         Some(Arc::new(key))
     }
 
-    fn get_or_update(
+    fn get_or_fetch(
         &self,
         key: QTreeKey,
         _mvs: Arc<RwLock<MapViewState>>,

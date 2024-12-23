@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use ehttp::Request;
 
 pub mod png;

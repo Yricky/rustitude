@@ -1,5 +1,5 @@
 use std::{
-    collections::{vec_deque, VecDeque},
+    collections::VecDeque,
     fmt::Display,
     hash::Hash,
     ops::{Shl, Shr},

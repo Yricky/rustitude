@@ -21,12 +21,17 @@ type HotMap = Arc<Mutex<FxHashMap<QTreeKey, u128>>>;
 
 #[derive(Clone)]
 pub struct EguiMapPngResImpl {
-    pub typ: String,
+    /// 类型
+    typ: String,
+    /// 磁盘缓存路径前缀，非空时会优先从对应路径的磁盘缓存中加载，从网络加载时也会缓存到路径中，为空时只会从网络加载。
+    /// 本地路径格式为：{cache_path_prefix}/{typ}/{z}_{x}_{y}.png
     cache_path_prefix: Option<String>,
     request_builder: Arc<dyn RequestBuilder>,
-    pub data_map: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
-    pub rt: Arc<tokio::runtime::Runtime>,
-    pub loading_lock: Arc<RwLock<FxHashSet<u64>>>,
+    data_map: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
+    rt: Arc<tokio::runtime::Runtime>,
+    /// 记录正在加载中的key
+    loading_lock: Arc<RwLock<FxHashSet<u64>>>,
+    /// 记录每个key的最后一次访问时间，用于清理过期的内存缓存
     hot_map: HotMap,
 }
 
@@ -73,7 +78,7 @@ impl EguiMapTileRes for EguiMapPngResImpl {
         return None;
     }
 
-    fn get_or_update(
+    fn get_or_fetch(
         &self,
         key: QTreeKey,
         mvs: Arc<RwLock<MapViewState>>,
@@ -252,12 +257,12 @@ impl EguiMapPngResImpl {
     fn remove_img_cache(
         self: &Self,
         ctx: &Context,
-        dm: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
+        data_map: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
         hot_map: &mut FxHashMap<QTreeKey, u128>,
         will_del: &mut Vec<QTreeKey>,
     ) {
         {
-            let mut m = dm.write().unwrap();
+            let mut m = data_map.write().unwrap();
             will_del.iter().for_each(|k| {
                 m.remove(k);
             });
