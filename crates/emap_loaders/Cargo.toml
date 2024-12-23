@@ -1,10 +1,13 @@
 [package]
-name = "emap"
+name = "emap_loaders"
 version = "0.1.0"
 edition = "2021"
-
 [lib]
 
 [dependencies]
 egui.workspace = true
+ehttp.workspace = true
+rustc-hash.workspace = true
+tokio.workspace = true
+emap.workspace = true
 rustitude_base.workspace = true

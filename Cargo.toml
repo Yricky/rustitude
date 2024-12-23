@@ -11,13 +11,15 @@ eframe.workspace = true
 egui.workspace = true
 ehttp.workspace = true
 emap.workspace = true
+emap_loaders.workspace = true
 rustc-hash.workspace = true
 tokio.workspace = true
 egui_extras.workspace = true
 image.workspace = true
 
+
 [workspace]
-members = ["crates/base", "crates/emap"]
+members = ["crates/base", "crates/emap", "crates/emap_loaders"]
 
 [workspace.dependencies]
 eframe = { version = "0.30.0" }
@@ -29,3 +31,4 @@ rustc-hash = "2.1.0"
 tokio = { version = "1.41.0", features = ["rt-multi-thread"] }
 rustitude_base = { version = "0.1.0", path = "crates/base" }
 emap = { version = "0.1.0", path = "crates/emap" }
+emap_loaders = { version = "0.1.0", path = "crates/emap_loaders" }

@@ -15,25 +15,30 @@ use emap::{
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustitude_base::{curr_time_millis, map_view_state::MapViewState, qtree::QTreeKey};
 
-use crate::view::priv_fn::build_req;
+use crate::RequestBuilder;
 
 type HotMap = Arc<Mutex<FxHashMap<QTreeKey, u128>>>;
 
 #[derive(Clone)]
-pub struct EguiMapImgResImpl {
+pub struct EguiMapPngResImpl {
     pub typ: String,
     cache_path_prefix: Option<String>,
+    request_builder: Arc<dyn RequestBuilder>,
     pub data_map: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
     pub rt: Arc<tokio::runtime::Runtime>,
     pub loading_lock: Arc<RwLock<FxHashSet<u64>>>,
     hot_map: HotMap,
 }
 
-impl EguiMapImgResImpl {
+impl EguiMapPngResImpl {
     const TOKIO_RT: OnceCell<Arc<tokio::runtime::Runtime>> = OnceCell::new();
 
-    pub fn new(typ: &str, cache_path_prefix: Option<&str>) -> Self {
-        let rt = EguiMapImgResImpl::TOKIO_RT
+    pub fn new(
+        typ: &str,
+        cache_path_prefix: Option<&str>,
+        request_builder: Arc<dyn RequestBuilder>,
+    ) -> Self {
+        let rt = EguiMapPngResImpl::TOKIO_RT
             .get_or_init(|| {
                 Arc::new(
                     tokio::runtime::Builder::new_multi_thread()
@@ -45,9 +50,10 @@ impl EguiMapImgResImpl {
                 )
             })
             .clone();
-        EguiMapImgResImpl {
+        EguiMapPngResImpl {
             typ: String::from(typ),
             cache_path_prefix: cache_path_prefix.map(|s| String::from(s)),
+            request_builder: request_builder,
             data_map: Arc::new(RwLock::new(FxHashMap::default())),
             rt: rt,
             loading_lock: Arc::new(RwLock::new(FxHashSet::default())),
@@ -56,7 +62,7 @@ impl EguiMapImgResImpl {
     }
 }
 
-impl EguiMapTileRes for EguiMapImgResImpl {
+impl EguiMapTileRes for EguiMapPngResImpl {
     fn get_memory_cache(&self, key: QTreeKey) -> Option<CommonEguiTileDrawable> {
         if let Some(img) = self.data_map.read().unwrap().get(&key) {
             if let Ok(mut hm) = self.hot_map.try_lock() {
@@ -85,6 +91,7 @@ impl EguiMapTileRes for EguiMapImgResImpl {
         let c = ctx.clone();
         let s = self.clone();
         let is_loading = loading_locks.contains(&key.inner_key());
+        let rq = self.request_builder.clone();
         if let Some(cpp) = self.cache_path_prefix.clone() {
             let tfp = format!(
                 "{}/{}/{}_{}_{}.png",
@@ -130,7 +137,7 @@ impl EguiMapTileRes for EguiMapImgResImpl {
                     if z == lt.depth() && lt.x() <= x && x <= rb.x() && lt.y() <= y && y <= rb.y() {
                         let lock_file_path = format!("{}.tmp", tfp.as_str());
                         println!("fetch:{}_{}_{}", z, x, y);
-                        let req = build_req(typ.as_str(), x, y, z);
+                        let req = rq.build_req(typ.as_str(), x, y, z);
                         let resp = ehttp::fetch_blocking(&req);
                         if let Ok(r) = resp {
                             if r.status == 200 {
@@ -175,7 +182,7 @@ impl EguiMapTileRes for EguiMapImgResImpl {
                     }
                     if z == lt.depth() && lt.x() <= x && x <= rb.x() && lt.y() <= y && y <= rb.y() {
                         println!("fetch:{}_{}_{}", z, x, y);
-                        let req = build_req(typ.as_str(), x, y, z);
+                        let req = rq.build_req(typ.as_str(), x, y, z);
                         let resp = ehttp::fetch_blocking(&req);
                         if let Ok(r) = resp {
                             if r.status == 200 {
@@ -196,7 +203,7 @@ impl EguiMapTileRes for EguiMapImgResImpl {
     }
 }
 
-impl EguiMapImgResImpl {
+impl EguiMapPngResImpl {
     fn load_img(self: &Self, key: QTreeKey, ctx: Context, vec: Arc<[u8]>) -> bool {
         let dm = self.data_map.clone();
         let hm = self.hot_map.clone();

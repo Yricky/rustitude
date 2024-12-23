@@ -1,9 +1,10 @@
 use std::sync::{Arc, RwLock};
-pub mod view;
+mod priv_fn;
 use egui::Margin;
 use emap::{egui_map::EguiMap, DebugPrintKeyTileRes, EguiMapTileRes};
+use emap_loaders::png::EguiMapPngResImpl;
+use priv_fn::TiandituRequestBuilder;
 use rustitude_base::{map_state::Location, map_view_state::MapViewState};
-use view::egui::EguiMapImgResImpl;
 
 fn main() {
     let _ = eframe::run_native(
@@ -20,10 +21,22 @@ fn main() {
                     view_size: [1280.0, 800.0],
                     zoom_lvl: 2.0,
                 })),
-                main_res: Arc::new(EguiMapImgResImpl::new("img", Some("tiles"))),
+                main_res: Arc::new(EguiMapPngResImpl::new(
+                    "img",
+                    Some("tiles"),
+                    Arc::new(TiandituRequestBuilder::Test),
+                )),
                 other_res: vec![
-                    Arc::new(EguiMapImgResImpl::new("cia", Some("tiles"))),
-                    Arc::new(EguiMapImgResImpl::new("cva", Some("tiles"))),
+                    Arc::new(EguiMapPngResImpl::new(
+                        "cia",
+                        Some("tiles"),
+                        Arc::new(TiandituRequestBuilder::Test),
+                    )),
+                    Arc::new(EguiMapPngResImpl::new(
+                        "cva",
+                        Some("tiles"),
+                        Arc::new(TiandituRequestBuilder::Test),
+                    )),
                 ],
                 debug: false,
             }))
