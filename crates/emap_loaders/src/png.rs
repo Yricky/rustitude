@@ -15,17 +15,17 @@ use emap::{
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustitude_base::{curr_time_millis, map_view_state::MapViewState, qtree::QTreeKey};
 
-use crate::RequestBuilder;
+use crate::{BinTileCache, RequestBuilder};
 
 type HotMap = Arc<Mutex<FxHashMap<QTreeKey, u128>>>;
 
 #[derive(Clone)]
 pub struct EguiMapPngResImpl {
-    /// 类型
+    /// 类型，用于生成全局图片缓存的key等场景
     typ: String,
     /// 磁盘缓存路径前缀，非空时会优先从对应路径的磁盘缓存中加载，从网络加载时也会缓存到路径中，为空时只会从网络加载。
     /// 本地路径格式为：{cache_path_prefix}/{typ}/{z}_{x}_{y}.png
-    cache_path_prefix: Option<String>,
+    cache: Option<Arc<dyn BinTileCache>>,
     request_builder: Arc<dyn RequestBuilder>,
     data_map: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
     rt: Arc<tokio::runtime::Runtime>,
@@ -57,7 +57,10 @@ impl EguiMapPngResImpl {
             .clone();
         EguiMapPngResImpl {
             typ: String::from(typ),
-            cache_path_prefix: cache_path_prefix.map(|s| String::from(s)),
+            cache: cache_path_prefix.map(|s| format!("{}/{}",s,typ)).map(|s| Arc::new(DiskDirTileCache{
+                cache_path_prefix: s,
+                file_ext: String::from("png")
+            }) as Arc<dyn BinTileCache>),
             request_builder: request_builder,
             data_map: Arc::new(RwLock::new(FxHashMap::default())),
             rt: rt,
@@ -97,18 +100,10 @@ impl EguiMapTileRes for EguiMapPngResImpl {
         let s = self.clone();
         let is_loading = loading_locks.contains(&key.inner_key());
         let rq = self.request_builder.clone();
-        if let Some(cpp) = self.cache_path_prefix.clone() {
-            let tfp = format!(
-                "{}/{}/{}_{}_{}.png",
-                cpp.as_str(),
-                self.typ.as_str(),
-                z,
-                x,
-                y
-            );
+        if let Some(cache) = self.cache.clone() {
             if is_loading {
                 return None;
-            } else if fs::exists(tfp.as_str()).unwrap_or(false) {
+            } else if cache.exist(key) { //存在缓存
                 loading_locks.insert(key.inner_key());
                 self.rt.spawn(async move {
                     let lt;
@@ -119,9 +114,10 @@ impl EguiMapTileRes for EguiMapPngResImpl {
                         rb = mvs.bottom_right_key();
                     }
                     if z == lt.depth() && lt.x() <= x && x <= rb.x() && lt.y() <= y && y <= rb.y() {
-                        let vec = fs::read(tfp.as_str()).unwrap_or(vec![]);
-                        if !s.load_img(key, c.clone(), vec.into()) {
-                            let _ = fs::remove_file(tfp.as_str());
+                        if let Some(vec) = cache.load(key) {
+                            if !s.load_img(key, c.clone(), vec) {
+                                cache.delete(key);
+                            }
                         }
                         c.request_repaint();
                     }
@@ -140,31 +136,23 @@ impl EguiMapTileRes for EguiMapPngResImpl {
                         rb = mvs.bottom_right_key();
                     }
                     if z == lt.depth() && lt.x() <= x && x <= rb.x() && lt.y() <= y && y <= rb.y() {
-                        let lock_file_path = format!("{}.tmp", tfp.as_str());
                         println!("fetch:{}_{}_{}", z, x, y);
                         let req = rq.build_req(typ.as_str(), x, y, z);
                         let resp = ehttp::fetch_blocking(&req);
                         if let Ok(r) = resp {
                             if r.status == 200 {
-                                let path = format!("{}/{}", cpp.as_str(), typ.as_str());
-                                if !fs::exists(path.as_str()).unwrap_or(false) {
-                                    let _ = fs::create_dir_all(path.as_str());
-                                }
-                                let bytes: Arc<[u8]> = r.bytes.into();
+                                let bytes: Arc<[u8]> = rq.decode_response(r);
                                 if !s.load_img(key, c.clone(), bytes.clone()) {
-                                    let _ = fs::remove_file(tfp.as_str());
+                                    cache.delete(key);
                                 } else {
+                                    cache.save(key, bytes);
                                     c.request_repaint();
-                                    fs::write(lock_file_path.clone(), bytes).unwrap();
-                                    let _ = fs::rename(lock_file_path, tfp.as_str());
                                 }
                             } else {
                                 println!("resp status:{}", r.status);
-                                let _ = fs::remove_file(lock_file_path);
                             }
                         } else if let Err(r) = resp {
                             println!("resp error:{}", r);
-                            let _ = fs::remove_file(lock_file_path);
                         }
                     }
                     send_lock.write().unwrap().remove(&key.inner_key());
@@ -297,5 +285,53 @@ impl EguiMapPngResImpl {
             key.x(),
             key.y()
         )
+    }
+}
+
+pub struct DiskDirTileCache{
+    cache_path_prefix:String,
+    file_ext:String
+}
+
+impl DiskDirTileCache {
+    fn path_of(&self,key:QTreeKey) -> String {
+        format!(
+            "{}/{}_{}_{}.{}",
+            self.cache_path_prefix.as_str(),
+            key.depth(),
+            key.x(),
+            key.y(),
+            self.file_ext.as_str()
+        )
+    }
+}
+
+impl BinTileCache for DiskDirTileCache {
+    fn save(&self,key:QTreeKey,value: Arc<[u8]>) {
+        if !fs::exists(self.cache_path_prefix.as_str()).unwrap_or(false) {
+            let _ = fs::create_dir_all(self.cache_path_prefix.as_str());
+        }
+        let cache_file_path = self.path_of(key);
+        let lock_file_path = format!("{}.tmp",cache_file_path.as_str());
+        if fs::exists(lock_file_path.as_str()).unwrap_or(false) {
+            return;
+        }
+        fs::write(lock_file_path.clone(), value).unwrap();
+        let _ = fs::rename(lock_file_path, cache_file_path.as_str());
+    }
+
+    fn load(&self,key:QTreeKey) -> Option<Arc<[u8]>> {
+        let cache_file_path = self.path_of(key);
+        return fs::read(cache_file_path.as_str()).map(|v|v.into()).ok();
+    }
+
+    fn exist(&self,key:QTreeKey) -> bool {
+        let cache_file_path = self.path_of(key);
+        fs::exists(cache_file_path.as_str()).unwrap_or(false)
+    }
+
+    fn delete(&self,key:QTreeKey) {
+        let cache_file_path = self.path_of(key);
+        let _ = fs::remove_file(cache_file_path.as_str());
     }
 }

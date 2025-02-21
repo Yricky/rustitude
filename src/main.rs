@@ -1,10 +1,9 @@
-use std::sync::{Arc, RwLock};
-mod priv_fn;
 use egui::Margin;
+use ehttp::Request;
 use emap::{egui_map::EguiMap, DebugPrintKeyTileRes, EguiMapTileRes};
-use emap_loaders::png::EguiMapPngResImpl;
-use priv_fn::TiandituRequestBuilder;
-use rustitude_base::{map_state::Location, map_view_state::MapViewState};
+use emap_loaders::{png::EguiMapPngResImpl, RequestBuilder};
+use rustitude_base::{latlng::{WebMercator, WCS}, map_state::Location, map_view_state::MapViewState};
+use std::sync::{Arc, RwLock};
 
 fn main() {
     let _ = eframe::run_native(
@@ -24,24 +23,34 @@ fn main() {
                 main_res: Arc::new(EguiMapPngResImpl::new(
                     "img",
                     Some("tiles"),
-                    Arc::new(TiandituRequestBuilder::Test),
+                    Arc::new(ShipxyReqBuilder),
                 )),
                 other_res: vec![
-                    Arc::new(EguiMapPngResImpl::new(
-                        "cia",
-                        Some("tiles"),
-                        Arc::new(TiandituRequestBuilder::Test),
-                    )),
-                    Arc::new(EguiMapPngResImpl::new(
-                        "cva",
-                        Some("tiles"),
-                        Arc::new(TiandituRequestBuilder::Test),
-                    )),
+                    // Arc::new(EguiMapPngResImpl::new(
+                    //     "cia",
+                    //     Some("tiles"),
+                    //     Arc::new(TiandituRequestBuilder::Test),
+                    // )),
+                    // Arc::new(EguiMapPngResImpl::new(
+                    //     "cva",
+                    //     Some("tiles"),
+                    //     Arc::new(TiandituRequestBuilder::Test),
+                    // )),
                 ],
                 debug: false,
             }))
         }),
     );
+}
+
+pub struct ShipxyReqBuilder;
+impl RequestBuilder for ShipxyReqBuilder {
+    fn build_req(&self, _typ: &str, x: u32, y: u32, z: u8) -> ehttp::Request {
+        Request::get(format!(
+            "https://gwxc.shipxy.com/tile.g?z={}&x={}&y={}",
+            z, x, y
+        ))
+    }
 }
 
 struct MapViewStateTestApp {
@@ -62,13 +71,17 @@ impl eframe::App for MapViewStateTestApp {
         egui::CentralPanel::default()
             .frame(egui::Frame::canvas(&ctx.style()).inner_margin(Margin::ZERO))
             .show(ctx, |ui| {
-                if let Some(cpu_usage) = frame.info().cpu_usage {
-                    ui.label(format!("cpuTime:{}ms", cpu_usage * 1000.0));
-                }
+                ui.horizontal(|ui|{
+                    ui.label(format!("{}",WebMercator.to_lat_lng(self.map_view_state.read().unwrap().central)));
+                    if let Some(cpu_usage) = frame.info().cpu_usage {
+                        ui.label(format!("cpuTime:{}ms", cpu_usage * 1000.0));
+                    }
+                });
+
                 ui.checkbox(&mut self.debug, "debug");
-                if self.debug && self.other_res.len() == 2 {
+                if self.debug && self.other_res.len() == 0 {
                     self.other_res.push(Arc::new(DebugPrintKeyTileRes));
-                } else if !self.debug && self.other_res.len() == 3 {
+                } else if !self.debug && self.other_res.len() == 1 {
                     self.other_res.pop();
                 }
                 self.egui_map(ui, self.main_res.clone(), &self.other_res, self.debug);

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use egui::{load::SizedTexture, pos2, vec2, Align2, Color32, FontId, Painter, Rect, Vec2};
+use egui::{epaint::CornerRadiusF32, load::SizedTexture, pos2, vec2, Align2, Color32, FontId, Painter, Rect, Stroke, Vec2};
 use rustitude_base::qtree::QTreeKey;
 
 pub const TILE_SIZE_VEC2: Vec2 = vec2(256.0, 256.0);
@@ -51,6 +51,12 @@ impl EguiTileDrawable for (SizedTexture, Rect) {
 
 impl EguiTileDrawable for QTreeKey {
     fn draw(&self, painter: &Painter, rect: Rect) {
+        painter.rect_stroke(
+            rect,
+            CornerRadiusF32::same(0.0),
+            Stroke::new(1.0, Color32::from_rgb(0xff, 0x11, 0)),
+            egui::StrokeKind::Inside,
+        );
         painter.text(
             rect.min,
             Align2::LEFT_TOP,
