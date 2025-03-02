@@ -14,6 +14,7 @@ rustitude_base.workspace = true
 rustitude_mvt = { workspace = true, optional = true }
 
 [features]
-default = ["png"]
+default = ["png","mvt"]
 png = []
 mvt = ["rustitude_mvt"]
+mbtiles = []

@@ -6,8 +6,7 @@ edition = "2021"
 
 
 [dependencies]
-mvt-reader = "1.6.0"
-prost = {workspace = true}
+prost = { workspace = true }
 
 [build-dependencies]
-prost-build = {workspace = true}
+prost-build = { workspace = true }

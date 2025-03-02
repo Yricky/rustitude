@@ -35,4 +35,3 @@ emap = { version = "0.1.0", path = "crates/emap" }
 emap_loaders = { version = "0.1.0", path = "crates/emap_loaders" }
 prost = "0.13.5"
 prost-build = "0.13.5"
-

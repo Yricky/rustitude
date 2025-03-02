@@ -49,8 +49,18 @@ pub trait EguiMap {
             &mut mvs,
             self.map_view_state(),
             res,
-            other_res,
+            true
         );
+        other_res.iter().for_each(|res|{
+            emap_default_impl_draw_map_tile(
+                ui,
+                &painter,
+                &mut mvs,
+                self.map_view_state(),
+                res.clone(),
+                false
+            );
+        });
         if debug {
             painter.rect_stroke(
                 rect.shrink(1.0),
@@ -94,7 +104,7 @@ pub fn emap_default_impl_draw_map_tile(
     mvs: &MapViewState,
     mvs_ref: Arc<RwLock<MapViewState>>,
     res: Arc<dyn EguiMapTileRes>,
-    other_res: &Vec<Arc<dyn EguiMapTileRes>>,
+    is_base_tile:bool
 ) {
     walk(mvs.top_left_key(), mvs.bottom_right_key()).for_each(|k| {
         let lt = mvs.location_to_view_pos(Location::from_qtree_key(k));
@@ -115,7 +125,7 @@ pub fn emap_default_impl_draw_map_tile(
         }
         if let Some(t) = tile {
             t.draw(&painter, this_rect);
-        } else {
+        } else if is_base_tile {
             painter.rect_filled(
                 this_rect,
                 CornerRadius::ZERO,
@@ -130,12 +140,6 @@ pub fn emap_default_impl_draw_map_tile(
                 ),
             );
         }
-        other_res.iter().for_each(|r| {
-            let tile = r.get_or_fetch(k, mvs_ref.clone(), ui.ctx());
-            if let Some(t) = tile {
-                t.draw(&painter, this_rect);
-            }
-        });
     });
 }
 

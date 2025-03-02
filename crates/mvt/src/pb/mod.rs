@@ -2,10 +2,8 @@ pub mod geobuf;
 pub mod vector_tile;
 
 mod test {
-    use std::fs;
-
-    use mvt_reader::Reader;
     use prost::Message;
+    use std::fs;
 
     use super::{
         geobuf::Data,
