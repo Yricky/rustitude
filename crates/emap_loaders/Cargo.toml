@@ -11,3 +11,9 @@ rustc-hash.workspace = true
 tokio.workspace = true
 emap.workspace = true
 rustitude_base.workspace = true
+rustitude_mvt = { workspace = true, optional = true }
+
+[features]
+default = ["png"]
+png = []
+mvt = ["rustitude_mvt"]

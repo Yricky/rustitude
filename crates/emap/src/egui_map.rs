@@ -1,7 +1,8 @@
 use std::sync::{Arc, RwLock};
 
 use egui::{
-    load::BytesLoader, vec2, Color32, InnerResponse, Painter, Pos2, Rect, Rounding, Sense, Stroke,
+    load::BytesLoader, vec2, Color32, CornerRadius, InnerResponse,
+    Painter, Pos2, Rect, Sense, Stroke,
 };
 use rustitude_base::{
     map_state::{walk, Location},
@@ -53,8 +54,9 @@ pub trait EguiMap {
         if debug {
             painter.rect_stroke(
                 rect.shrink(1.0),
-                Rounding::same(0.0),
+                CornerRadius::ZERO,
                 Stroke::new(1.0, Color32::from_rgb(0xff, 0x11, 0)),
+                egui::StrokeKind::Middle,
             );
             ui.vertical(|ui| {
                 ui.label(format!("Rect:{}", rect));
@@ -116,7 +118,7 @@ pub fn emap_default_impl_draw_map_tile(
         } else {
             painter.rect_filled(
                 this_rect,
-                Rounding::ZERO,
+                CornerRadius::ZERO,
                 Color32::from_rgb(
                     k.depth() * 8,
                     0xff - k.depth() * 8,

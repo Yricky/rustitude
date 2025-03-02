@@ -81,6 +81,7 @@ impl Location {
     }
 }
 
+/// 遍历一个区域内的所有瓦片，从右下到左上
 pub fn walk(lt: QTreeKey, rb: QTreeKey) -> impl Iterator<Item = QTreeKey> {
     if lt.depth() != rb.depth() {
         panic!("depth not equal");
