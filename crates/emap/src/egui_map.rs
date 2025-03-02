@@ -1,8 +1,8 @@
 use std::sync::{Arc, RwLock};
 
 use egui::{
-    load::BytesLoader, vec2, Color32, CornerRadius, InnerResponse,
-    Painter, Pos2, Rect, Sense, Stroke,
+    load::BytesLoader, vec2, Color32, CornerRadius, InnerResponse, Painter, Pos2, Rect, Sense,
+    Stroke,
 };
 use rustitude_base::{
     map_state::{walk, Location},
@@ -43,22 +43,15 @@ pub trait EguiMap {
                 mvs_central.y - (scroll.y as f64) / (TILE_SIZE * mvs_zoom),
             ));
         }
-        emap_default_impl_draw_map_tile(
-            ui,
-            &painter,
-            &mut mvs,
-            self.map_view_state(),
-            res,
-            true
-        );
-        other_res.iter().for_each(|res|{
+        emap_default_impl_draw_map_tile(ui, &painter, &mut mvs, self.map_view_state(), res, true);
+        other_res.iter().for_each(|res| {
             emap_default_impl_draw_map_tile(
                 ui,
                 &painter,
                 &mut mvs,
                 self.map_view_state(),
                 res.clone(),
-                false
+                false,
             );
         });
         if debug {
@@ -104,7 +97,7 @@ pub fn emap_default_impl_draw_map_tile(
     mvs: &MapViewState,
     mvs_ref: Arc<RwLock<MapViewState>>,
     res: Arc<dyn EguiMapTileRes>,
-    is_base_tile:bool
+    is_base_tile: bool,
 ) {
     walk(mvs.top_left_key(), mvs.bottom_right_key()).for_each(|k| {
         let lt = mvs.location_to_view_pos(Location::from_qtree_key(k));

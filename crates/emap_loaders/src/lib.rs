@@ -1,4 +1,7 @@
-use std::{cell::OnceCell, sync::{Arc, Mutex, RwLock}};
+use std::{
+    cell::OnceCell,
+    sync::{Arc, Mutex, RwLock},
+};
 
 use dir_tile_cache::DiskDirTileCache;
 use egui::Context;
@@ -7,32 +10,31 @@ use emap::{tile_drawable::CommonEguiTileDrawable, EguiMapTileRes};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustitude_base::{curr_time_millis, map_view_state::MapViewState, qtree::QTreeKey};
 
-#[cfg(feature = "png")]
-pub mod png;
+pub mod dir_tile_cache;
 #[cfg(feature = "mvt")]
 pub mod mvt;
-pub mod dir_tile_cache;
+#[cfg(feature = "png")]
+pub mod png;
 
 pub trait RequestBuilder: Send + Sync {
     fn build_req(&self, typ: &str, x: u32, y: u32, z: u8) -> Request;
-    
-    fn decode_response(&self, resp:Response) -> Arc<[u8]> {
+
+    fn decode_response(&self, resp: Response) -> Arc<[u8]> {
         resp.bytes.into()
     }
 }
 
 pub trait TileLoader: Send + Sync {
-    fn mem_cache(self:&Self) -> &MemoryDrawableCache; 
+    fn mem_cache(self: &Self) -> &MemoryDrawableCache;
     fn load_img(self: &Self, key: QTreeKey, ctx: Context, vec: Arc<[u8]>) -> bool;
 }
 
-pub trait BinTileCache: Send + Sync{
-    fn save(&self,key:QTreeKey,value: Arc<[u8]>);
-    fn load(&self,key:QTreeKey) -> Option<Arc<[u8]>>;
-    fn exist(&self,key:QTreeKey) -> bool;
-    fn delete(&self,key:QTreeKey);
+pub trait BinTileCache: Send + Sync {
+    fn save(&self, key: QTreeKey, value: Arc<[u8]>);
+    fn load(&self, key: QTreeKey) -> Option<Arc<[u8]>>;
+    fn exist(&self, key: QTreeKey) -> bool;
+    fn delete(&self, key: QTreeKey);
 }
-
 
 pub struct MemoryDrawableCache {
     data_map: Arc<RwLock<FxHashMap<QTreeKey, CommonEguiTileDrawable>>>,
@@ -93,7 +95,6 @@ impl MemoryDrawableCache {
     }
 }
 
-
 struct _EguiMapBinResImpl {
     /// 类型，用于生成全局图片缓存的key等场景
     typ: String,
@@ -103,7 +104,7 @@ struct _EguiMapBinResImpl {
     rt: Arc<tokio::runtime::Runtime>,
     /// 记录正在加载中的key
     loading_lock: RwLock<FxHashSet<u64>>,
-    loader: Box<dyn TileLoader>
+    loader: Box<dyn TileLoader>,
 }
 
 #[derive(Clone)]
@@ -116,7 +117,7 @@ impl EguiMapBinResImpl {
 
     pub fn new(
         typ: &str,
-        file_ext:impl Into<String>,
+        file_ext: impl Into<String>,
         cache_path_prefix: Option<&str>,
         request_builder: Box<dyn RequestBuilder>,
         loader: Box<dyn TileLoader>,
@@ -135,7 +136,6 @@ impl EguiMapBinResImpl {
             .clone();
         Self {
             inner: Arc::new(_EguiMapBinResImpl {
-                
                 cache: cache_path_prefix
                     .map(|s| format!("{}/{}", s, typ))
                     .map(|s| {
@@ -145,7 +145,7 @@ impl EguiMapBinResImpl {
                         }) as Arc<dyn BinTileCache>
                     }),
                 request_builder: request_builder,
-                
+
                 rt: rt,
                 loading_lock: RwLock::new(FxHashSet::default()),
                 loader: loader,
@@ -199,7 +199,11 @@ impl EguiMapTileRes for EguiMapBinResImpl {
                         }
                         c.request_repaint();
                     }
-                    s.inner.loading_lock.write().unwrap().remove(&key.inner_key());
+                    s.inner
+                        .loading_lock
+                        .write()
+                        .unwrap()
+                        .remove(&key.inner_key());
                 });
                 return None;
             } else {
@@ -235,7 +239,11 @@ impl EguiMapTileRes for EguiMapBinResImpl {
                             println!("resp error:{}", r);
                         }
                     }
-                    s.inner.loading_lock.write().unwrap().remove(&key.inner_key());
+                    s.inner
+                        .loading_lock
+                        .write()
+                        .unwrap()
+                        .remove(&key.inner_key());
                 });
                 return None;
             }
@@ -270,7 +278,11 @@ impl EguiMapTileRes for EguiMapBinResImpl {
                             println!("resp error:{}", r);
                         }
                     }
-                    s.inner.loading_lock.write().unwrap().remove(&key.inner_key());
+                    s.inner
+                        .loading_lock
+                        .write()
+                        .unwrap()
+                        .remove(&key.inner_key());
                 });
                 return None;
             }

@@ -78,7 +78,7 @@ mod tests {
         assert_eq!(nw.lng, -180.0);
         assert_eq!(nw.lat, 85.0511287798066);
         let nl = WebMercator.to_location(nw);
-        assert_eq!(nl.x,0.0);
+        assert_eq!(nl.x, 0.0);
         assert_eq!(nl.y, 0.0);
 
         // 测试中心点（0.5,0.5）对应赤道
@@ -92,4 +92,3 @@ mod tests {
         assert_eq!(se.lat, -85.0511287798066);
     }
 }
-

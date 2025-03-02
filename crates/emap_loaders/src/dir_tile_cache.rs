@@ -4,7 +4,6 @@ use rustitude_base::qtree::QTreeKey;
 
 use crate::BinTileCache;
 
-
 pub struct DiskDirTileCache {
     pub cache_path_prefix: String,
     pub file_ext: String,

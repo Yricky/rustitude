@@ -1,8 +1,14 @@
 use egui::Margin;
 use ehttp::Request;
-use emap::{egui_map::EguiMap, DebugPrintKeyTileRes, EguiMapTileRes};
-use emap_loaders::{mvt::MvtLoader, png::PngLoader, EguiMapBinResImpl, MemoryDrawableCache, RequestBuilder};
-use rustitude_base::{latlng::{WebMercator, WCS}, map_state::Location, map_view_state::MapViewState};
+use emap::{egui_map::EguiMap, EguiMapTileRes};
+use emap_loaders::{
+    mvt::MvtLoader, png::PngLoader, EguiMapBinResImpl, MemoryDrawableCache, RequestBuilder,
+};
+use rustitude_base::{
+    latlng::{WebMercator, WCS},
+    map_state::Location,
+    map_view_state::MapViewState,
+};
 use std::sync::{Arc, RwLock};
 
 fn main() {
@@ -48,10 +54,10 @@ fn main() {
                     "png",
                     Some("tiles"),
                     Box::new(ShipxyReqBuilder),
-                    Box::new(PngLoader{
+                    Box::new(PngLoader {
                         typ: String::from("img"),
                         mem_cache: MemoryDrawableCache::new(),
-                    })
+                    }),
                 )),
                 other_res: vec![
                     Arc::new(EguiMapBinResImpl::new(
@@ -59,21 +65,20 @@ fn main() {
                         "mvt",
                         Some("tiles"),
                         Box::new(BingReqBuilder),
-                        Box::new(MvtLoader{
+                        Box::new(MvtLoader {
                             typ: String::from("mvt"),
                             mem_cache: MemoryDrawableCache::new(),
-                        })
-                    ))
-                    // Arc::new(EguiMapPngResImpl::new(
-                    //     "cia",
-                    //     Some("tiles"),
-                    //     Arc::new(TiandituRequestBuilder::Test),
-                    // )),
-                    // Arc::new(EguiMapPngResImpl::new(
-                    //     "cva",
-                    //     Some("tiles"),
-                    //     Arc::new(TiandituRequestBuilder::Test),
-                    // )),
+                        }),
+                    )), // Arc::new(EguiMapPngResImpl::new(
+                        //     "cia",
+                        //     Some("tiles"),
+                        //     Arc::new(TiandituRequestBuilder::Test),
+                        // )),
+                        // Arc::new(EguiMapPngResImpl::new(
+                        //     "cva",
+                        //     Some("tiles"),
+                        //     Arc::new(TiandituRequestBuilder::Test),
+                        // )),
                 ],
                 debug: false,
             }))
@@ -119,8 +124,11 @@ impl eframe::App for MapViewStateTestApp {
         egui::CentralPanel::default()
             .frame(egui::Frame::canvas(&ctx.style()).inner_margin(Margin::ZERO))
             .show(ctx, |ui| {
-                ui.horizontal(|ui|{
-                    ui.label(format!("{}",WebMercator.to_lat_lng(self.map_view_state.read().unwrap().central)));
+                ui.horizontal(|ui| {
+                    ui.label(format!(
+                        "{}",
+                        WebMercator.to_lat_lng(self.map_view_state.read().unwrap().central)
+                    ));
                     if let Some(cpu_usage) = frame.info().cpu_usage {
                         ui.label(format!("cpuTime:{}ms", cpu_usage * 1000.0));
                     }

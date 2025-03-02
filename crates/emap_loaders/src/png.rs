@@ -9,9 +9,8 @@ use rustitude_base::qtree::QTreeKey;
 
 use crate::{MemoryDrawableCache, TileLoader};
 
-
-pub struct PngLoader{
-    pub typ:String,
+pub struct PngLoader {
+    pub typ: String,
     pub mem_cache: MemoryDrawableCache,
 }
 
@@ -76,8 +75,8 @@ impl TileLoader for PngLoader {
             }
         }
     }
-    
-    fn mem_cache(self:&Self) -> &MemoryDrawableCache {
+
+    fn mem_cache(self: &Self) -> &MemoryDrawableCache {
         &self.mem_cache
     }
 }

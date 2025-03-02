@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use egui::{epaint::CornerRadiusF32, load::SizedTexture, pos2, vec2, Align2, Color32, FontId, Painter, Rect, Stroke, Vec2};
+use egui::{
+    epaint::CornerRadiusF32, load::SizedTexture, pos2, vec2, Align2, Color32, FontId, Painter,
+    Rect, Stroke, Vec2,
+};
 use rustitude_base::qtree::QTreeKey;
 
 pub const TILE_SIZE_VEC2: Vec2 = vec2(256.0, 256.0);
